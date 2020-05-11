@@ -14,12 +14,30 @@ class Terrain:
     def __init__(self,
                  height: int,
                  width: int,
+                 max_height: int,
+                 min_height: int,
+                 min_width: int,
+                 max_width: int,
                  borders: Optional[List[Direction]] = None):
         self.height = height
         self.width = width
 
+        self.max_height = max_height
+        self.min_height = min_height
+        self.min_width = min_width
+        self.max_width = max_width
+
         self.area = self.height * self.width
         self.borders = borders  # without borders reaching the max constraint it will teleport the snake
+
+
+class SnakeBorderHit(Exception):
+    pass
+
+
+class SnakeOuroboros(Exception):
+    """When it eats its own tail"""
+    pass
 
 
 class Snake:
@@ -53,9 +71,9 @@ class Snake:
              direction: Direction) -> None:
         if not isinstance(direction, Direction):
             return
-        # if direction == -self.direction:
-        #     # for now just dont move at all if the opposite direction was issued
-        #     return
+        if direction.value == -self.direction.value:
+            # for now just dont move at all if the opposite direction was issued
+            return
         self.direction = direction
 
         how_much = 1
@@ -69,7 +87,30 @@ class Snake:
 
         head_y, head_x = self.current_coordinates[0][0], self.current_coordinates[0][1]
         new_head = (head_y + change_y, head_x + change_x)
+        if new_head in self.current_coordinates[1:]:
+            raise SnakeOuroboros()
+        if not self.terrain.min_height < new_head[0]:
+            # top border
+            if Direction.UP in self.terrain.borders:
+                raise SnakeBorderHit()
+            new_head = self.terrain.max_height - 1, new_head[1]
+        elif not new_head[0] < self.terrain.max_height:
+            # bottom border
+            if Direction.DOWN in self.terrain.borders:
+                raise SnakeBorderHit
+            new_head = self.terrain.min_height + 1, new_head[1]
 
-        if 0 < new_head[0] < self.terrain.height:
-            self.current_coordinates.insert(0, new_head)
+        elif not new_head[1] < self.terrain.max_width:
+            # right border
+            if Direction.RIGHT in self.terrain.borders:
+                raise SnakeBorderHit
+            new_head = new_head[0], self.terrain.min_width + 1
+
+        elif not self.terrain.min_width < new_head[1]:
+            # left_border
+            if Direction.LEFT in self.terrain.borders:
+                raise SnakeBorderHit
+            new_head = new_head[0], self.terrain.max_width - 1
+
+        self.current_coordinates.insert(0, new_head)
         del self.current_coordinates[-1]

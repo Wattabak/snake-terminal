@@ -2,7 +2,8 @@ import curses
 import logging
 from curses import textpad
 from typing import Tuple, List, Sequence
-from models import Snake, Direction, Terrain
+
+from models import Snake, Direction, Terrain, SnakeBorderHit, SnakeOuroboros
 
 logging.basicConfig(filename='snake.log', level=logging.DEBUG)
 
@@ -20,6 +21,7 @@ def draw_ch(window, y: int, x: int, ch: str):
 
 
 def run(window) -> None:
+    window.clear()
     curses.curs_set(0)
 
     # Create playable area
@@ -29,18 +31,23 @@ def run(window) -> None:
 
     height = max_height - padding[0] - padding[2]
     width = max_width - padding[1] - padding[3]
-    logging.info(f"Window drawn: height: {height} \n width: {width}")
+    logging.info(f"Window sizes: height: {height} \n width: {width}")
 
     win_left_corner, win_right_corner = ([padding[0], padding[3]],
                                          [max_height - padding[2], max_width - padding[1]])
-    terrain = Terrain(width=width, height=height)
+    terrain = Terrain(width=width,
+                      height=height,
+                      max_height=win_right_corner[0],
+                      min_height=win_left_corner[0],
+                      min_width=win_left_corner[1],
+                      max_width=win_right_corner[1],
+                      borders=[Direction.UP]
+                      )
     # draw playable area
     textpad.rectangle(
         window,
-        win_left_corner[0],
-        win_left_corner[1],
-        win_right_corner[0],
-        win_right_corner[1],
+        *win_left_corner,
+        *win_right_corner,
     )
     center = win_left_corner[0] + height // 2, win_right_corner[1] // 2
 
@@ -87,14 +94,35 @@ def run(window) -> None:
                 x=cur_tail_x,
                 ch=" "
                 )  # erase previous tail
-
-        snake.move(direction=direction)  # create new coordinates
+        try:
+            snake.move(direction=direction)  # create new coordinates
+        except Exception as e:
+            game_over(window, center, e)
 
         draw_ch_list(window,
                      coordinates=snake.current_coordinates,
                      ch_list=snake.body
                      )  # draw new coords
 
+
+def game_over(window, center, ending: Exception, score: int=0, time_elapsed= None):
+    window.clear()
+    logging.info(ending)
+    if isinstance(ending, SnakeBorderHit):
+        ending = "You hit a wall!"
+    if isinstance(ending, SnakeOuroboros):
+        ending = "You ate yourself?!"
+    window.addstr(*center, f"GAME OVER, {ending}")
+    window.addstr(center[0]+1, center[1], f"Your score: {score}")
+    window.addstr(center[0]+4, center[1], "Try again?[y]/[n]")
+    window.keypad(1)
+    key = window.getch()
+    if key == ord("y"):
+        run(window)
+    if key == ord("n") or key == 3:
+        raise KeyboardInterrupt
+    else:
+        game_over(window, center, score, time_elapsed)
 
 if __name__ == '__main__':
     curses.wrapper(run)
