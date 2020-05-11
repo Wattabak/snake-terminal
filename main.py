@@ -1,5 +1,6 @@
 import curses
 import logging
+import random
 from curses import textpad
 from typing import Tuple, List, Sequence
 
@@ -18,6 +19,17 @@ def draw_ch_list(window,
 
 def draw_ch(window, y: int, x: int, ch: str):
     window.addstr(y, x, ch)  # put new
+
+
+def get_food_coords(snake: Snake,
+                    terrain: Terrain) -> Tuple[int, int]:
+    food_y, food_x = (
+        random.randint(terrain.min_height+1, terrain.max_height-1),
+        random.randint(terrain.min_width+1, terrain.max_width-1)
+    )
+    if (food_y, food_x) in snake.current_coordinates:
+        food_y, food_x = get_food_coords(snake, terrain)
+    return food_y, food_x
 
 
 def run(window) -> None:
@@ -67,9 +79,18 @@ def run(window) -> None:
                  coordinates=snake.initial_coordinates,
                  ch_list=snake.body
                  )
-
+    # Create and draw food
+    food = curses.ACS_PI
+    food_y, food_x = get_food_coords(snake, terrain)
+    window.addch(food_y, food_x, food)
     # run a game
+    direction = Direction.RIGHT
+
+    score = 0
+    # draw score
+    window.addstr(1, 1, f"Score: {score}")
     while True:
+        window.timeout(100)
         key = window.getch()
         movement = {
             curses.KEY_UP: Direction.UP,
@@ -85,44 +106,54 @@ def run(window) -> None:
 
         elif key == 3:
             raise KeyboardInterrupt
-        else:
-            continue
         cur_tail_y, cur_tail_x = snake.current_coordinates[-1]
 
+        try:
+            snake.move(direction=direction)  # create new coordinates
+        except Exception as e:
+            logging.exception(f"Exception: {e}")
+            window.timeout(0)
+            game_over(window, center, e, score)
         draw_ch(window,
                 y=cur_tail_y,
                 x=cur_tail_x,
                 ch=" "
                 )  # erase previous tail
-        try:
-            snake.move(direction=direction)  # create new coordinates
-        except Exception as e:
-            game_over(window, center, e)
 
         draw_ch_list(window,
                      coordinates=snake.current_coordinates,
                      ch_list=snake.body
                      )  # draw new coords
 
+        if snake.current_coordinates[0] == (food_y, food_x):
+            score += 1
+            food_y, food_x = get_food_coords(snake, terrain)
+            window.addch(food_y, food_x, food)
+        window.addstr(1, 1, f"Score: {score}")
 
-def game_over(window, center, ending: Exception, score: int=0, time_elapsed= None):
+
+def game_over(window,
+              center,
+              ending: Exception,
+              score: int = 0,
+              time_elapsed=None):
     window.clear()
     logging.info(ending)
     if isinstance(ending, SnakeBorderHit):
         ending = "You hit a wall!"
     if isinstance(ending, SnakeOuroboros):
         ending = "You ate yourself?!"
-    window.addstr(*center, f"GAME OVER, {ending}")
-    window.addstr(center[0]+1, center[1], f"Your score: {score}")
-    window.addstr(center[0]+4, center[1], "Try again?[y]/[n]")
-    window.keypad(1)
-    key = window.getch()
-    if key == ord("y"):
-        run(window)
-    if key == ord("n") or key == 3:
-        raise KeyboardInterrupt
-    else:
-        game_over(window, center, score, time_elapsed)
+    while True:
+        window.addstr(*center, f"GAME OVER, {ending}")
+        window.addstr(center[0] + 1, center[1], f"Your score: {score}")
+        window.addstr(center[0] + 4, center[1], "Try again?[y]/[n]")
+        window.keypad(1)
+        key = window.getch()
+        if key == ord("y"):
+            run(window)
+        if key == ord("n") or key == 3:
+            raise KeyboardInterrupt
+
 
 if __name__ == '__main__':
     curses.wrapper(run)

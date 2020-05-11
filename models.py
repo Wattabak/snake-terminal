@@ -73,7 +73,7 @@ class Snake:
             return
         if direction.value == -self.direction.value:
             # for now just dont move at all if the opposite direction was issued
-            return
+            direction = self.direction
         self.direction = direction
 
         how_much = 1
