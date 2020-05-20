@@ -8,6 +8,18 @@ from models import Snake, Direction, Terrain, SnakeBorderHit, SnakeOuroboros
 
 logging.basicConfig(filename='snake.log', level=logging.DEBUG)
 
+base_settings = {
+    "borders": None,
+    "board_height": 10,
+    "board_width": 10,
+}
+
+prod_settings = {
+    "borders": ["left", "right", "top", "bottom"],
+    "board_height": 10,
+    "board_width": 10,
+}
+
 
 def draw_ch_list(window,
                  coordinates: List[Tuple[int, int]],
@@ -18,14 +30,14 @@ def draw_ch_list(window,
 
 
 def draw_ch(window, y: int, x: int, ch: str):
-    window.addstr(y, x, ch)  # put new
+    window.addch(y, x, ch)  # put new
 
 
 def get_food_coords(snake: Snake,
                     terrain: Terrain) -> Tuple[int, int]:
     food_y, food_x = (
-        random.randint(terrain.min_height+1, terrain.max_height-1),
-        random.randint(terrain.min_width+1, terrain.max_width-1)
+        random.randint(terrain.min_height + 1, terrain.max_height - 1),
+        random.randint(terrain.min_width + 1, terrain.max_width - 1)
     )
     if (food_y, food_x) in snake.current_coordinates:
         food_y, food_x = get_food_coords(snake, terrain)
@@ -41,12 +53,14 @@ def run(window) -> None:
 
     padding = [4, 4, 4, 4]  # top, right, bottom, left
 
+    # height = max_height - padding[0] - padding[2]
+    # width = max_width - padding[1] - padding[3]
     height = max_height - padding[0] - padding[2]
-    width = max_width - padding[1] - padding[3]
+    width = 20
     logging.info(f"Window sizes: height: {height} \n width: {width}")
 
     win_left_corner, win_right_corner = ([padding[0], padding[3]],
-                                         [max_height - padding[2], max_width - padding[1]])
+                                         [padding[0] + height, padding[1] + width])
     terrain = Terrain(width=width,
                       height=height,
                       max_height=win_right_corner[0],
@@ -60,6 +74,7 @@ def run(window) -> None:
         window,
         *win_left_corner,
         *win_right_corner,
+
     )
     center = win_left_corner[0] + height // 2, win_right_corner[1] // 2
 
@@ -127,6 +142,7 @@ def run(window) -> None:
 
         if snake.current_coordinates[0] == (food_y, food_x):
             score += 1
+            snake.grow()
             food_y, food_x = get_food_coords(snake, terrain)
             window.addch(food_y, food_x, food)
         window.addstr(1, 1, f"Score: {score}")
@@ -156,4 +172,7 @@ def game_over(window,
 
 
 if __name__ == '__main__':
-    curses.wrapper(run)
+    try:
+        curses.wrapper(run)
+    except KeyboardInterrupt:
+        print("Thanks for playing!")

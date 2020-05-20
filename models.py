@@ -114,3 +114,7 @@ class Snake:
 
         self.current_coordinates.insert(0, new_head)
         del self.current_coordinates[-1]
+
+    def grow(self) -> None:
+        self.body_length += 1
+        self.current_coordinates.insert(-1, self.current_coordinates[-1])
